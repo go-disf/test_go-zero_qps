@@ -2,40 +2,73 @@ package main
 
 import (
 	"context"
+	"flag"
+	"fmt"
 	"log"
+	"os"
+	"sync"
 	"sync/atomic"
 	"time"
 
-	pb "github.com/sdfwds4/test_go-micro_qps/proto"
+	pb "github.com/sdfwds4/test_go-zero_qps/proto"
+	"github.com/zeromicro/go-zero/core/conf"
+	"github.com/zeromicro/go-zero/core/logx"
+	"github.com/zeromicro/go-zero/zrpc"
 
-	// "github.com/micro/plugins/v5/server/grpc"
-	"go-micro.dev/v5"
+	"google.golang.org/grpc"
 )
 
 var counter int64
 
-type Greeter struct{}
+var configFile = flag.String("f", "../etc/config.json", "the config file")
 
-func (g *Greeter) Hello(ctx context.Context, req *pb.Request, rsp *pb.Response) error {
-	rsp.Greeting = "Hello " + req.Name
+type GreetServer struct {
+	lock     sync.Mutex
+	alive    bool
+	downTime time.Time
+}
+
+func NewGreetServer() *GreetServer {
+	return &GreetServer{
+		alive: true,
+	}
+}
+
+func (gs *GreetServer) Greet(ctx context.Context, req *pb.Request) (*pb.Response, error) {
+	// fmt.Println("=>", req)
 
 	atomic.AddInt64(&counter, 1)
 
-	return nil
+	hostname, err := os.Hostname()
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.Response{
+		Greet: "hello from " + hostname,
+	}, nil
 }
 
 func main() {
-	service := micro.NewService(
-		micro.Name("helloworld"),
-		micro.Address("127.0.0.1:8081"),
-		// micro.Server(grpc.NewServer()),
-	)
+	flag.Parse()
 
-	// optionally setup command line usage
-	service.Init()
+	var c zrpc.RpcServerConf
+	conf.MustLoad(*configFile, &c)
+	logx.SetLevel(logx.ErrorLevel)
+	logx.Disable()
+	logx.Close()
 
-	// Register Handlers
-	pb.RegisterGreeterHandler(service.Server(), new(Greeter))
+	server := zrpc.MustNewServer(c, func(grpcServer *grpc.Server) {
+		pb.RegisterGreeterServer(grpcServer, NewGreetServer())
+	})
+	// interceptor := func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+	// 	// st := time.Now()
+	// 	resp, err = handler(ctx, req)
+	// 	// log.Printf("method: %s time: %v\n", info.FullMethod, time.Since(st))
+	// 	return resp, err
+	// }
+
+	// server.AddUnaryInterceptors(interceptor)
 
 	go func() {
 		var t = time.Now().UnixNano() / 1e6
@@ -50,8 +83,8 @@ func main() {
 		}
 	}()
 
+	fmt.Println("server start ...")
+
 	// Run server
-	if err := service.Run(); err != nil {
-		log.Fatal(err)
-	}
+	server.Start()
 }

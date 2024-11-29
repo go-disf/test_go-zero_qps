@@ -1,0 +1,16 @@
+{
+	"Name": "rpc.unary",
+    "MetricsUrl": "http://localhost:2222/add",
+    "ListenOn": "localhost:3456",
+    "Etcd": {
+        "Hosts": [
+            "localhost:2379"
+        ],
+        "Key": "zrpc"
+    },
+    "Log": {
+        "Mode": "volume",
+        "Level": "error"
+    },
+    "Auth": false
+}

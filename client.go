@@ -2,36 +2,39 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"time"
 
-	pb "github.com/sdfwds4/test_go-micro_qps/proto"
-	// "github.com/micro/plugins/v5/client/grpc"
-
-	"go-micro.dev/v5"
-	"go-micro.dev/v5/client"
+	pb "github.com/sdfwds4/test_go-zero_qps/proto"
+	"github.com/zeromicro/go-zero/core/conf"
+	"github.com/zeromicro/go-zero/zrpc"
 )
 
+const name = "kevin"
+
+var configFile = flag.String("f", "../etc/config.json", "the config file")
+
 func main() {
-	// create a new service
-	service := micro.NewService(
-		micro.Name("helloworld"),
-		// micro.Client(grpc.NewClient()),
-	)
+	flag.Parse()
 
-	// parse command line flags
-	service.Init()
+	fmt.Println("client start ...")
 
-	// Use the generated client stub
-	cl := pb.NewGreeterService("helloworld", service.Client())
-	cxt := context.Background()
 	start := time.Now()
 
 	var rsp *pb.Response
 	var err error
+
+	var c zrpc.RpcClientConf
+	conf.MustLoad(*configFile, &c)
+	client := zrpc.MustNewClient(c)
+	conn := client.Conn()
 	for {
 		// Make request
-		rsp, err = cl.Hello(cxt, &pb.Request{Name: "John"}, client.WithAddress("127.0.0.1:8081"))
+		greet := pb.NewGreeterClient(conn)
+		rsp, err = greet.Greet(context.Background(), &pb.Request{
+			Name: "kevin",
+		})
 		if err != nil {
 			fmt.Println("Error:", err)
 			return
@@ -40,5 +43,5 @@ func main() {
 
 	fmt.Println("duration:", time.Since(start))
 
-	fmt.Println("rsp.Greeting:", rsp.Greeting)
+	fmt.Println("rsp.Greeting:", rsp.Greet)
 }
